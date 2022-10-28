@@ -289,12 +289,15 @@ class PuzzleSolver(QtWidgets.QMainWindow):
         self.display_path()
 
     def solve(self):
-        self.ui.progressLabel.show()
         self.i = 0
         if self.mode == 'input':
             valid = self.validate()
             if not valid:
                 return
+
+        self.ui.progressLabel.show()
+        self.ui.nextButton.setEnabled(True)
+        self.ui.prevButton.setEnabled(False)
 
         cost, explored, max_depth, runtime = 0, 0, 0, 0
 
@@ -412,7 +415,7 @@ class PuzzleSolver(QtWidgets.QMainWindow):
         self.state = ['0', '1', '2', '3', '4', '5', '6', '7', '8']
         random.shuffle(self.state)
         self.display_state()
-        self.state = ''.join(self.state)
+        self.state = int(''.join(self.state))
 
         self.ui.algorithmBox.show()
 
