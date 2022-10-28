@@ -347,6 +347,10 @@ class PuzzleSolver(QtWidgets.QMainWindow):
         self.ui.nextButton.show()
         self.ui.prevButton.show()
         self.ui.costLabel.show()
+        self.ui.depthResult.show()
+        self.ui.costResult.show()
+        self.ui.runtimeResult.show()
+        self.ui.expandedResult.show()
 
         self.ui.costResult.setText(str(cost))
         self.ui.expandedResult.setText(str(explored))
