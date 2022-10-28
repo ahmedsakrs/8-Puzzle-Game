@@ -322,6 +322,17 @@ class PuzzleSolver(QtWidgets.QMainWindow):
         elif self.ui.dfsRadio.isChecked():
             result = DFS(self.state)
             if not result:
+                self.ui.pathFrame.hide()
+                self.ui.prevButton.hide()
+                self.ui.nextButton.hide()
+                self.ui.costLabel.hide()
+                self.ui.runtimeLabel.hide()
+                self.ui.depthLabel.hide()
+                self.ui.expandedLabel.hide()
+                self.ui.costResult.hide()
+                self.ui.runtimeResult.hide()
+                self.ui.depthResult.hide()
+                self.ui.expandedResult.hide()
                 self.ui.progressLabel.setText('This State has no path to the goal')
                 return
             self.path, cost, explored, max_depth, runtime = result
