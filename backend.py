@@ -1,7 +1,5 @@
 from math import sqrt
-
 import PyQt5
-
 from frontend import Ui_MainWindow
 from PyQt5 import QtWidgets
 import random
@@ -330,47 +328,46 @@ def heuristicEuclidean(state: int) -> float:
     temp = sqrt(pow((x8 - 3), 2) + pow((y8 - 1), 2))
     res = res + temp
 
-    return res
+    return int(res)
 
 
 def A(start_state: int, flag: int):
     max_depth = 0
     found = False
-    h = heuristicEuclidean(start_state) if flag == 1 else heuristicManhattan(start_state)
-    frontier = [[h, start_state]]
-    frontier_map = {start_state: h}
+    f = heuristicEuclidean(start_state) if flag == 1 else heuristicManhattan(start_state)
+    h = f
+    frontier = [[f, h, start_state]]
+    frontier_map = {start_state: f}
     explored = set()
     parent_map = {start_state: start_state}
     start_time = time.time()
 
     while frontier:
-        heapq.heapify(frontier)
-        state = frontier.pop(0)
-        frontier_map.pop(state[1])
-        explored.add(state[1])
-        g = state[0] + 1
+        state = heapq.heappop(frontier)
+        frontier_map.pop(state[2])
+        explored.add(state[2])
+        g = state[0] - state[1]
         max_depth = max(max_depth, g)
 
-        if isGoal(state[1]):
+        if isGoal(state[2]):
             found = True
             break
 
-        for child in getChildren(state[1]):
+        for child in getChildren(state[2]):
             if child not in frontier_map and child not in explored:
-                f = heuristicEuclidean(child) + g if flag == 1 else heuristicManhattan(child)
-                frontier.append([f, child])
-                max_depth = max(max_depth, g)
-                frontier_map[child] = f
-                parent_map[child] = state[1]
+                h = heuristicEuclidean(child) if flag == 1 else heuristicManhattan(child)
+                frontier.append([h + g + 1, h, child])
+                max_depth = max(max_depth, g + 1)
+                frontier_map[child] = h + g
+                parent_map[child] = state[2]
 
             elif child in frontier_map:
-                f = heuristicEuclidean(child) + g if flag == 1 else heuristicManhattan(child)
+                h = heuristicEuclidean(child) if flag == 1 else heuristicManhattan(child)
                 temp = frontier_map[child]
-                if f < temp:
-                    frontier.append([f, child])
-                    max_depth = max(max_depth, g)
-                    frontier_map[child] = f
-                    parent_map[child] = state[1]
+                if h + g < temp:
+                    max_depth = max(max_depth, g + 1)
+                    frontier_map[child] = h + g
+                    parent_map[child] = state[2]
 
     runtime = round(time.time() - start_time, 3)
     explored = len(explored)
@@ -491,55 +488,30 @@ class PuzzleSolver(QtWidgets.QMainWindow):
         self.ui.depthResult.show()
         self.ui.expandedResult.show()
 
-        cost, explored, max_depth, runtime = 0, 0, 0, 0
+        result = None
 
         if self.ui.bfsRadio.isChecked():
             result = BFS(self.state)
-            if len(result) == 3:
-                self.ui.pathFrame.hide()
-                self.ui.prevButton.hide()
-                self.ui.nextButton.hide()
-                self.ui.costResult.hide()
-                self.ui.costLabel.hide()
-                self.ui.runtimeResult.setText(str(result[2]) + ' sec')
-                self.ui.depthResult.setText(str(result[1]))
-                self.ui.expandedResult.setText(str(result[0]))
-                self.ui.progressLabel.setText('This State has no path to the goal')
-                return
-            self.path, cost, explored, max_depth, runtime = result
 
         elif self.ui.dfsRadio.isChecked():
             result = DFS(self.state)
-            if len(result) == 3:
-                self.ui.pathFrame.hide()
-                self.ui.prevButton.hide()
-                self.ui.nextButton.hide()
-                self.ui.costLabel.hide()
-                self.ui.costResult.hide()
-                self.ui.runtimeResult.setText(str(result[2]) + ' sec')
-                self.ui.depthResult.setText(str(result[1]))
-                self.ui.expandedResult.setText(str(result[0]))
-                self.ui.progressLabel.setText('This State has no path to the goal')
-                return
-            self.path, cost, explored, max_depth, runtime = result
 
         elif self.ui.aRadio.isChecked():
-            if self.ui.manhattanRadio.isChecked():
-                f = 0
-            else:
-                f = 1
-            result = A(self.state, f)
-            if len(result) == 3:
-                self.ui.pathFrame.hide()
-                self.ui.prevButton.hide()
-                self.ui.nextButton.hide()
-                self.ui.costResult.hide()
-                self.ui.runtimeResult.setText(str(result[2]) + ' sec')
-                self.ui.depthResult.setText(str(result[1]))
-                self.ui.expandedResult.setText(str(result[0]))
-                self.ui.progressLabel.setText('This State has no path to the goal')
-                return
-            self.path, cost, explored, max_depth, runtime = result
+            heuristic = 0 if self.ui.manhattanRadio.isChecked() else 1
+
+            result = A(self.state, heuristic)
+        if len(result) == 3:
+            self.ui.pathFrame.hide()
+            self.ui.prevButton.hide()
+            self.ui.nextButton.hide()
+            self.ui.costLabel.hide()
+            self.ui.costResult.hide()
+            self.ui.runtimeResult.setText(str(result[2]) + ' sec')
+            self.ui.depthResult.setText(str(result[1]))
+            self.ui.expandedResult.setText(str(result[0]))
+            self.ui.progressLabel.setText('This State has no path to the goal')
+            return
+        self.path, cost, explored, max_depth, runtime = result
 
         self.ui.pathFrame.show()
         self.ui.nextButton.show()
@@ -614,7 +586,10 @@ class PuzzleSolver(QtWidgets.QMainWindow):
         self.ui.solveButton.show()
 
     def show_heuristic(self) -> None:
-        self.ui.solveButton.hide()
+        if not self.ui.euclideanRadio.isChecked() and not self.ui.manhattanRadio.isChecked():
+            self.ui.solveButton.hide()
+        else:
+            self.ui.solveButton.show()
         self.ui.heuristicGroup.show()
 
     def initialize_random(self) -> None:
