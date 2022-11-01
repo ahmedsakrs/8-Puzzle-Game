@@ -344,7 +344,8 @@ def A(start_state: int, flag: int):
 
     while frontier:
         state = heapq.heappop(frontier)
-        frontier_map.pop(state[2])
+        if state[2] in frontier_map:
+            frontier_map.pop(state[2])
         explored.add(state[2])
         g = state[0] - state[1]
         max_depth = max(max_depth, g)
@@ -356,7 +357,7 @@ def A(start_state: int, flag: int):
         for child in getChildren(state[2]):
             if child not in frontier_map and child not in explored:
                 h = heuristicEuclidean(child) if flag == 1 else heuristicManhattan(child)
-                frontier.append([h + g + 1, h, child])
+                heapq.heappush(frontier, [h + g + 1, h, child])
                 max_depth = max(max_depth, g + 1)
                 frontier_map[child] = h + g
                 parent_map[child] = state[2]
@@ -365,6 +366,7 @@ def A(start_state: int, flag: int):
                 h = heuristicEuclidean(child) if flag == 1 else heuristicManhattan(child)
                 temp = frontier_map[child]
                 if h + g < temp:
+                    heapq.heappush(frontier, [h + g + 1, h, child])
                     max_depth = max(max_depth, g + 1)
                     frontier_map[child] = h + g
                     parent_map[child] = state[2]
