@@ -4,16 +4,19 @@ import heapq
 
 
 def getPath(parent_map: dict) -> list[int]:
-    # array containing final path to goal state
+    """
+    :param parent_map: Contains each child state as a key and the value is its parent
+    :return: The path from start state to goal state
+    """
+
     path = []
-    # assuming this function is called only when reached goal state, so we will start with it
     child = 12345678
-    # loop until we find start state
     while True:
         path.append(child)
         parent = parent_map[child]
         # if we find start state we reverse the array, so it is ordered from state to goal
         if parent == child:
+            # parent = child only when start state is reached
             path.reverse()
             return path
 
@@ -28,6 +31,10 @@ def isGoal(state: int) -> bool:
 
 
 def getChildren(state: int) -> list[int]:
+    """
+    :param state: State in integer form
+    :return: List of all possible children
+    """
     state = str(state)
     if len(state) == 8:
         state = '0' + state
@@ -41,21 +48,25 @@ def getChildren(state: int) -> list[int]:
     col = index % 3
 
     if row > 0:
+        # if row > 0, 0 can be swapped with the upper row
         child = state.copy()
         child[row * 3 + col], child[(row - 1) * 3 + col] = child[(row - 1) * 3 + col], child[row * 3 + col]
         children.append(int(''.join(child)))
 
     if row < 2:
+        # if row < 2, 0 can be swapped with the lower row
         child = state.copy()
         child[row * 3 + col], child[(row + 1) * 3 + col] = child[(row + 1) * 3 + col], child[row * 3 + col]
         children.append(int(''.join(child)))
 
     if col > 0:
+        # if col > 0, 0 can be swapped with the previous column
         child = state.copy()
         child[row * 3 + col], child[row * 3 + col - 1] = child[row * 3 + col - 1], child[row * 3 + col]
         children.append(int(''.join(child)))
 
     if col < 2:
+        # if col < 2, 0 can be swapped with the following column
         child = state.copy()
         child[row * 3 + col], child[row * 3 + col + 1] = child[row * 3 + col + 1], child[row * 3 + col]
         children.append(int(''.join(child)))
@@ -63,42 +74,36 @@ def getChildren(state: int) -> list[int]:
     return children
 
 
-def BFS(start_state: int):
-    # start max depth
+def BFS(start_state: int) -> tuple:
+    """
+    :param start_state: The start state of the puzzle
+    :return: path, cost, explored, max_depth, runtime if there is a path, else returns explored, max_depth, runtime
+    """
     max_depth = 0
-    # set found with false
     found = False
+
     # frontier queue with start state inserted
-    frontier = [[start_state, 0]]  # what is 0 parameter?
-    # frontier set
+    # frontier queue is a list of lists
+    # each list consists of the state and its depth in the search tree
+
+    frontier = [[start_state, 0]]
     frontier_set = set()
-    # add start into frontier set
     frontier_set.add(start_state)
-    # explored set
     explored = set()
-    # parent map initialized with start state
     parent_map = {start_state: start_state}
-    # initialize time
     start_time = time.time()
 
-    # loop while frontier is not empty
     while frontier:
-        # get first state in queue
         state = frontier.pop(0)
-        # remove state from frontier set
         frontier_set.remove(state[0])
-        # add state to explored
         explored.add(state[0])
-        # find max depth: max of new state's depth and current max depth
         max_depth = max(max_depth, state[1])
 
-        # if goal state is reached break
         if isGoal(state[0]):
             found = True
             break
-        # get all children of new state
+
         for child in getChildren(state[0]):
-            # check if child is not in frontier and explored
             if child not in frontier_set and child not in explored:
                 frontier.append([child, state[1] + 1])
                 frontier_set.add(child)
@@ -115,6 +120,11 @@ def BFS(start_state: int):
 
 
 def getX(state: str, variable: str) -> int:
+    """
+    :param state: The state in str form
+    :param variable: The char aiming to get its X
+    :return: X of variable in the state
+    """
     index = state.index(variable)
     if index == 0 or index == 3 or index == 6:
         return 1
@@ -125,6 +135,11 @@ def getX(state: str, variable: str) -> int:
 
 
 def getY(state: str, variable: str) -> int:
+    """
+    :param state: The state in str form
+    :param variable: The char aiming to get its Y
+    :return: Y of variable in the state
+    """
     index = state.index(variable)
     if index == 0 or index == 1 or index == 2:
         return 3
@@ -135,6 +150,10 @@ def getY(state: str, variable: str) -> int:
 
 
 def heuristicManhattan(state: int) -> int:
+    """
+    :param state: The state in int form
+    :return: Manhattan Heuristic for the given state
+    """
     state = str(state)
     if len(state) == 8:
         state = '0' + state
@@ -174,7 +193,11 @@ def heuristicManhattan(state: int) -> int:
     return res
 
 
-def heuristicEuclidean(state: int) -> float:
+def heuristicEuclidean(state: int) -> int:
+    """
+    :param state: The state in int form
+    :return: Integer Euclidean Heuristic for the given state
+    """
     state = str(state)
     if len(state) == 8:
         state = '0' + state
@@ -214,11 +237,20 @@ def heuristicEuclidean(state: int) -> float:
     return int(res)
 
 
-def A(start_state: int, flag: int):
+def A(start_state: int, flag: int) -> tuple:
+    """
+    :param start_state: Start state of the puzzle
+    :param flag: 1 for Euclidean Heuristic | 0 for Manhattan Heuristic
+    :return: path, cost, explored, max_depth, runtime if there is a path, else returns explored, max_depth, runtime
+    """
     max_depth = 0
     found = False
     f = heuristicEuclidean(start_state) if flag == 1 else heuristicManhattan(start_state)
     h = f
+
+    # frontier heap with start state inserted
+    # frontier heap is a list of lists
+    # each list consists of the state, its heuristic and (cost + heuristic)
     frontier = [[f, h, start_state]]
     frontier_map = {start_state: f}
     explored = set()
@@ -249,6 +281,8 @@ def A(start_state: int, flag: int):
                 h = heuristicEuclidean(child) if flag == 1 else heuristicManhattan(child)
                 temp = frontier_map[child]
                 if h + g < temp:
+                    # if a smaller f was found, insert the state again in the frontier with the new f
+                    # update the parent map with the new parent for the state
                     heapq.heappush(frontier, [h + g + 1, h, child])
                     max_depth = max(max_depth, g + 1)
                     frontier_map[child] = h + g
@@ -264,9 +298,17 @@ def A(start_state: int, flag: int):
     return explored, max_depth, runtime
 
 
-def DFS(start_state: int):
+def DFS(start_state: int) -> tuple:
+    """
+    :param start_state: Start state of the puzzle
+    :return: path, cost, explored, max_depth, runtime if there is a path, else returns explored, max_depth, runtime
+    """
     max_depth = 0
     found = False
+
+    # frontier stack with start state inserted
+    # frontier stack is a list of lists
+    # each list consists of the state and its depth
 
     frontier = [[start_state, 0]]
     frontier_set = set()

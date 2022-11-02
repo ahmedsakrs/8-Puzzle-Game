@@ -8,6 +8,7 @@ class PuzzleSolver(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.ui = Ui_MainWindow()
+
         self.state = None
         self.mode = None
         self.path = None
@@ -29,19 +30,16 @@ class PuzzleSolver(QtWidgets.QMainWindow):
 
         self.ui.randomButton.clicked.connect(self.initialize_random)
         self.ui.stateButton.clicked.connect(self.get_input)
-
         self.ui.bfsRadio.clicked.connect(self.show_solve_hide_heuristic)
         self.ui.dfsRadio.clicked.connect(self.show_solve_hide_heuristic)
         self.ui.aRadio.clicked.connect(self.show_heuristic)
-
         self.ui.manhattanRadio.clicked.connect(self.show_solve)
         self.ui.euclideanRadio.clicked.connect(self.show_solve)
-
         self.ui.solveButton.clicked.connect(self.solve)
         self.ui.nextButton.clicked.connect(self.next)
         self.ui.prevButton.clicked.connect(self.prev)
 
-    def next(self):
+    def next(self) -> None:
         self.i += 1
         self.ui.progressLabel.setText('State ' + str(self.i) + ' / ' + str(len(self.path) - 1))
         self.ui.prevButton.setEnabled(True)
@@ -49,7 +47,7 @@ class PuzzleSolver(QtWidgets.QMainWindow):
             self.ui.nextButton.setEnabled(False)
         self.display_path()
 
-    def prev(self):
+    def prev(self) -> None:
         self.i -= 1
         self.ui.progressLabel.setText('State ' + str(self.i) + ' / ' + str(len(self.path) - 1))
         self.ui.nextButton.setEnabled(True)
@@ -57,7 +55,7 @@ class PuzzleSolver(QtWidgets.QMainWindow):
             self.ui.prevButton.setEnabled(False)
         self.display_path()
 
-    def solve(self):
+    def solve(self) -> None:
         self.i = 0
         if self.mode == 'input':
             valid = self.validate()
@@ -84,8 +82,8 @@ class PuzzleSolver(QtWidgets.QMainWindow):
 
         elif self.ui.aRadio.isChecked():
             heuristic = 0 if self.ui.manhattanRadio.isChecked() else 1
-
             result = A(self.state, heuristic)
+
         if len(result) == 3:
             self.ui.pathFrame.hide()
             self.ui.prevButton.hide()
@@ -111,9 +109,13 @@ class PuzzleSolver(QtWidgets.QMainWindow):
         self.ui.runtimeResult.setText(str(runtime) + ' sec')
         self.ui.progressLabel.setText('State ' + str(self.i) + ' / ' + str(len(self.path) - 1))
 
+        if self.state == 12345678:
+            self.ui.nextButton.setEnabled(False)
+            self.ui.prevButton.setEnabled(False)
+
         self.display_path()
 
-    def display_path(self):
+    def display_path(self) -> None:
         current = list(str(self.path[self.i]))
         if len(current) == 8:
             current.insert(0, '')
