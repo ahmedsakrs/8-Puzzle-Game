@@ -1,6 +1,6 @@
 # 8-Puzzle-Game
 ## Overview
-Solve 8 Puzzle Sliding game using dofferent search algorithms.
+Solve 8 Puzzle Sliding game using different search algorithms.
 
 Possible algorithms:
 * BFS
