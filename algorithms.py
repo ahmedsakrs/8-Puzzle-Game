@@ -1,455 +1,345 @@
-import sys
-from treelib import Tree, Node
+import time
+from math import sqrt
+import heapq
 
 
-def heuristic(state: list[list[str]]) -> int:
-    score = getScore(state)
-    heu = 10 * (score[0] - score[1])
-    # heu += 4 * check_children(state, '1')
-    # heu += 2 * check_children(state, '2')
-    heu -= 3 * checkDefiniteTwo(state)
-    heu += 4 * checkDefiniteFour(state, '2')
-    heu -= 4 * checkDefiniteFour(state, '1')
-    heu += checkDefiniteThreeInRow(state, '2')
-    heu -= checkDefiniteThreeInRow(state, '1')
-    heu += checkDefiniteThreeInDiagonal(state, '2')
-    heu -= checkDefiniteThreeInDiagonal(state, '1')
-    heu += checkThree(state, '2')
-    heu -= checkThree(state, '1')
-    heu += checkTwo(state, '2')
-    heu -= checkTwo(state, '1')
-    return heu
+def getPath(parent_map: dict) -> list[int]:
+    """
+    :param parent_map: Contains each child state as a key and the value is its parent
+    :return: The path from start state to goal state
+    """
+
+    path = []
+    child = 12345678
+    while True:
+        path.append(child)
+        parent = parent_map[child]
+        # if we find start state we reverse the array, so it is ordered from state to goal
+        if parent == child:
+            # parent = child only when start state is reached
+            path.reverse()
+            return path
+
+        child = parent
 
 
-def is_full(state: list[list[str]]) -> bool:
-    for col in range(7):
-        for row in range(6):
-            if state[row][col] == '0':
-                return False
-    return True
+def isGoal(state: int) -> bool:
+    if state == 12345678:
+        return True
+    else:
+        return False
 
 
-def getchildren(state: list[list[str]], flag: str) -> list[list[list[str]]]:
+def getChildren(state: int) -> list[int]:
+    """
+    :param state: State in integer form
+    :return: List of all possible children
+    """
+    state = str(state)
+    if len(state) == 8:
+        state = '0' + state
+
+    state = list(state)
     children = []
-    for col in range(7):
-        for row in range(6):
-            x = state[row][col]
-            if x == '0':
-                child = [state[i].copy() for i in range(6)]
-                if flag == '1':
-                    child[row][col] = '1'
-                    children.append(child)
-                else:
-                    child[row][col] = '2'
-                    children.append(child)
-                break
+
+    index = state.index('0')
+
+    row = index // 3
+    col = index % 3
+
+    if row > 0:
+        # if row > 0, 0 can be swapped with the upper row
+        child = state.copy()
+        child[row * 3 + col], child[(row - 1) * 3 + col] = child[(row - 1) * 3 + col], child[row * 3 + col]
+        children.append(int(''.join(child)))
+
+    if row < 2:
+        # if row < 2, 0 can be swapped with the lower row
+        child = state.copy()
+        child[row * 3 + col], child[(row + 1) * 3 + col] = child[(row + 1) * 3 + col], child[row * 3 + col]
+        children.append(int(''.join(child)))
+
+    if col > 0:
+        # if col > 0, 0 can be swapped with the previous column
+        child = state.copy()
+        child[row * 3 + col], child[row * 3 + col - 1] = child[row * 3 + col - 1], child[row * 3 + col]
+        children.append(int(''.join(child)))
+
+    if col < 2:
+        # if col < 2, 0 can be swapped with the following column
+        child = state.copy()
+        child[row * 3 + col], child[row * 3 + col + 1] = child[row * 3 + col + 1], child[row * 3 + col]
+        children.append(int(''.join(child)))
+
     return children
 
 
-def getScore(state: list[list[str]]) -> tuple:
-    agent = 0
-    user = 0
-    # check rows
-    for i in range(6):
-        for j in range(4):
-            if state[i][j] != '0' and state[i][j] == state[i][j + 1] and state[i][j] == state[i][j + 2] and \
-                    state[i][j] == state[i][j + 3]:
-                if state[i][j] == '1':
-                    user += 1
-                if state[i][j] == '2':
-                    agent += 1
-    # check columns
-    for j in range(7):
-        for i in range(3):
-            if state[i][j] != '0' and state[i][j] == state[i + 1][j] and state[i][j] == state[i + 2][j] and \
-                    state[i][j] == state[i + 3][j]:
-                if state[i][j] == '1':
-                    user += 1
-                if state[i][j] == '2':
-                    agent += 1
-    # check diagonals from the left
-    for i in range(3):
-        for j in range(4):
-            if state[i][j] != '0' and state[i][j] == state[i + 1][j + 1] and state[i][j] == state[i + 2][j + 2] and \
-                    state[i][j] == state[i + 3][j + 3]:
-                if state[i][j] == '1':
-                    user += 1
-                if state[i][j] == '2':
-                    agent += 1
-    # check diagonals from the right
-    for i in range(3):
-        for j in range(6, 2, -1):
-            if state[i][j] != '0' and state[i][j] == state[i + 1][j - 1] and state[i][j] == state[i + 2][j - 2] and \
-                    state[i][j] == state[i + 3][j - 3]:
-                if state[i][j] == '1':
-                    user += 1
-                if state[i][j] == '2':
-                    agent += 1
-    return agent, user
+def BFS(start_state: int) -> tuple:
+    """
+    :param start_state: The start state of the puzzle
+    :return: path, cost, explored, max_depth, runtime if there is a path, else returns explored, max_depth, runtime
+    """
+    max_depth = 0
+    found = False
+
+    # frontier queue with start state inserted
+    # frontier queue is a list of lists
+    # each list consists of the state and its depth in the search tree
+
+    frontier = [[start_state, 0]]
+    frontier_set = set()
+    frontier_set.add(start_state)
+    explored = set()
+    parent_map = {start_state: start_state}
+    start_time = time.time()
+
+    while frontier:
+        state = frontier.pop(0)
+        frontier_set.remove(state[0])
+        explored.add(state[0])
+        max_depth = max(max_depth, state[1])
+
+        if isGoal(state[0]):
+            found = True
+            break
+
+        for child in getChildren(state[0]):
+            if child not in frontier_set and child not in explored:
+                frontier.append([child, state[1] + 1])
+                frontier_set.add(child)
+                parent_map[child] = state[0]
+
+    runtime = round(time.time() - start_time, 3)
+    explored = len(explored)
+    if found:
+        path = getPath(parent_map)
+        cost = len(path) - 1
+        return path, cost, explored, max_depth, runtime
+
+    return explored, max_depth, runtime
 
 
-def check_children(state, flag):
-    children = getchildren(state, flag)
-    agent, user = getScore(state)
-    result = 0
-
-    for child in children:
-        newAgent, newUser = getScore(child)
-        if flag == '1':
-            result -= newUser - user
-        else:
-            result += newAgent - agent
-    return result
-
-
-def check_zeros(state, flag):
-    result = 0
-    agent, user = getScore(state)
-    for i in range(6):
-        for j in range(7):
-            if state[i][j] == '0':
-                newState = [state[z].copy() for z in range(6)]
-                if flag == '1':
-                    newState[i][j] = '1'
-                    newUser = getScore(newState)[1]
-                    result -= newUser - user
-
-                else:
-                    newState[i][j] = '2'
-                    newAgent = getScore(newState)[0]
-                    result += newAgent - agent
-    return result
+def getX(state: str, variable: str) -> int:
+    """
+    :param state: The state in str form
+    :param variable: The char aiming to get its X
+    :return: X of variable in the state
+    """
+    index = state.index(variable)
+    if index == 0 or index == 3 or index == 6:
+        return 1
+    if index == 1 or index == 4 or index == 7:
+        return 2
+    if index == 2 or index == 5 or index == 8:
+        return 3
 
 
-def checkDefiniteTwo(state: list[list[str]]) -> int:
-    result = 0
-    for i in range(6):
-        for j in range(3):
-            # 0,0,1,1,0
-            if state[i][j] == '0' and state[i][j + 1] == '0' and state[i][j + 2] == '1' and state[i][j + 3] == '1' and \
-                    state[i][j + 4] == '0':
-                if i == 0:
-                    result += 1
-                else:
-                    if state[i - 1][j] != '0' and state[i - 1][j + 1] != '0' and state[i - 1][j + 4] != '0':
-                        result += 1
-            # 0,1,1,0,0
-            if state[i][j] == '0' and state[i][j + 1] == '1' and state[i][j + 2] == '1' and state[i][j + 3] == '0' and \
-                    state[i][j + 4] == '0':
-                if i == 0:
-                    result += 1
-                else:
-                    if state[i - 1][j] != '0' and state[i - 1][j + 3] != '0' and state[i - 1][j + 4] != '0':
-                        result += 1
-    return result
+def getY(state: str, variable: str) -> int:
+    """
+    :param state: The state in str form
+    :param variable: The char aiming to get its Y
+    :return: Y of variable in the state
+    """
+    index = state.index(variable)
+    if index == 0 or index == 1 or index == 2:
+        return 3
+    if index == 3 or index == 4 or index == 5:
+        return 2
+    if index == 6 or index == 7 or index == 8:
+        return 1
 
 
-def checkDefiniteThreeInRow(state: list[list[str]], flag: str) -> int:
-    result = 0
-    for i in range(6):
-        for j in range(3):
-            # 0,1,1,1,0
-            if state[i][j] == '0' and state[i][j + 1] == flag and state[i][j + 2] == flag and \
-                    state[i][j + 3] == flag and state[i][j + 4] == '0':
-                if i == 0:
-                    result += 1
-                else:
-                    if state[i - 1][j] != '0' and state[i - 1][j + 4] != '0':
-                        result += 1
-    return result
+def heuristicManhattan(state: int) -> int:
+    """
+    :param state: The state in int form
+    :return: Manhattan Heuristic for the given state
+    """
+    state = str(state)
+    if len(state) == 8:
+        state = '0' + state
+
+    x1 = getX(state, '1')
+    y1 = getY(state, '1')
+    res = abs(x1 - 2) + abs(y1 - 3)
+
+    x2 = getX(state, '2')
+    y2 = getY(state, '2')
+    res += abs(x2 - 3) + abs(y2 - 3)
+
+    x3 = getX(state, '3')
+    y3 = getY(state, '3')
+    res += abs(x3 - 1) + abs(y3 - 2)
+
+    x4 = getX(state, '4')
+    y4 = getY(state, '4')
+    res += abs(x4 - 2) + abs(y4 - 2)
+
+    x5 = getX(state, '5')
+    y5 = getY(state, '5')
+    res += abs(x5 - 3) + abs(y5 - 2)
+
+    x6 = getX(state, '6')
+    y6 = getY(state, '6')
+    res += abs(x6 - 1) + abs(y6 - 1)
+
+    x7 = getX(state, '7')
+    y7 = getY(state, '7')
+    res += abs(x7 - 2) + abs(y7 - 1)
+
+    x8 = getX(state, '8')
+    y8 = getY(state, '8')
+    res += abs(x8 - 3) + abs(y8 - 1)
+
+    return res
 
 
-def checkDefiniteThreeInDiagonal(state: list[list[str]], flag: str) -> int:
-    result = 0
-    #               0
-    #           1
-    #       1
-    #   1
-    # 0
-    for i in range(2):
-        for j in range(3):
-            if state[i][j] == '0' and state[i + 4][j + 4] == '0' and state[i + 1][j + 1] == flag and state[i + 2][
-                j + 2] == flag and state[i + 3][j + 3] == flag:
-                if i == 0 and state[i + 3][j + 4] != '0':
-                    result += 1
-                else:
-                    if state[i - 1][j] != '0' and state[i + 3][j + 4] != '0':
-                        result += 1
-    # 0
-    #   1
-    #       1
-    #           1
-    #               0
-    for i in range(2):
-        for j in range(6, 3, -1):
-            if state[i][j] == '0' and state[i + 4][j - 4] == '0' and state[i + 1][j - 1] == flag and state[i + 2][
-                j - 2] == flag and state[i + 3][j - 3] == flag:
-                if i == 0 and state[i + 3][j - 4] != '0':
-                    result += 1
-                else:
-                    if state[i - 1][j] != '0' and state[i + 3][j - 4] != '0':
-                        result += 1
-    return result
+def heuristicEuclidean(state: int) -> int:
+    """
+    :param state: The state in int form
+    :return: Integer Euclidean Heuristic for the given state
+    """
+    state = str(state)
+    if len(state) == 8:
+        state = '0' + state
+
+    x1 = getX(state, '1')
+    y1 = getY(state, '1')
+    res = sqrt(pow((x1 - 2), 2) + pow((y1 - 3), 2))
+
+    x2 = getX(state, '2')
+    y2 = getY(state, '2')
+    res += sqrt(pow((x2 - 3), 2) + pow((y2 - 3), 2))
+
+    x3 = getX(state, '3')
+    y3 = getY(state, '3')
+    res += sqrt(pow((x3 - 1), 2) + pow((y3 - 2), 2))
+
+    x4 = getX(state, '4')
+    y4 = getY(state, '4')
+    res += sqrt(pow((x4 - 2), 2) + pow((y4 - 2), 2))
+
+    x5 = getX(state, '5')
+    y5 = getY(state, '5')
+    res += sqrt(pow((x5 - 3), 2) + pow((y5 - 2), 2))
+
+    x6 = getX(state, '6')
+    y6 = getY(state, '6')
+    res += sqrt(pow((x6 - 1), 2) + pow((y6 - 1), 2))
+
+    x7 = getX(state, '7')
+    y7 = getY(state, '7')
+    res += sqrt(pow((x7 - 2), 2) + pow((y7 - 1), 2))
+
+    x8 = getX(state, '8')
+    y8 = getY(state, '8')
+    res += sqrt(pow((x8 - 3), 2) + pow((y8 - 1), 2))
+
+    return int(res)
 
 
-def checkDefiniteFour(state: list[list[str]], flag: str) -> int:
-    result = 0
-    for i in range(1, 6):
-        for j in range(4):
-            # 0,1,1,1
-            # 0,1,1,1
-            if state[i][j] == '0' and state[i][j + 1] == flag and state[i][j + 2] == flag and state[i][j + 3] == flag:
-                if state[i - 1][j] == '0' and state[i - 1][j + 1] == flag and state[i - 1][j + 2] == flag and \
-                        state[i - 1][j + 3] == flag:
-                    result += 1
-            # 1,1,1,0
-            # 1,1,1,0
-            if state[i][j] == flag and state[i][j + 1] == flag and state[i][j + 2] == flag and state[i][j + 3] == '0':
-                if state[i - 1][j] == flag and state[i - 1][j + 1] == flag and state[i - 1][j + 2] == flag and \
-                        state[i - 1][j + 3] == '0':
-                    result += 1
-            # 1,0,1,1
-            # 1,0,1,1
-            if state[i][j] == flag and state[i][j + 1] == '0' and state[i][j + 2] == flag and state[i][j + 3] == flag:
-                if state[i - 1][j] == flag and state[i - 1][j + 1] == '0' and state[i - 1][j + 2] == flag and \
-                        state[i - 1][j + 3] == flag:
-                    result += 1
-            # 1,1,0,1
-            # 1,1,0,1
-            if state[i][j] == flag and state[i][j + 1] == flag and state[i][j + 2] == '0' and state[i][j + 3] == flag:
-                if state[i - 1][j] == flag and state[i - 1][j + 1] == flag and state[i - 1][j + 2] == '0' and \
-                        state[i - 1][j + 3] == flag:
-                    result += 1
-    return result
+def A(start_state: int, flag: int) -> tuple:
+    """
+    :param start_state: Start state of the puzzle
+    :param flag: 1 for Euclidean Heuristic | 0 for Manhattan Heuristic
+    :return: path, cost, explored, max_depth, runtime if there is a path, else returns explored, max_depth, runtime
+    """
+    max_depth = 0
+    found = False
+    f = heuristicEuclidean(start_state) if flag == 1 else heuristicManhattan(start_state)
+    h = f
+
+    # frontier heap with start state inserted
+    # frontier heap is a list of lists
+    # each list consists of the state, its heuristic and (cost + heuristic)
+    frontier = [[f, h, start_state]]
+    frontier_map = {start_state: f}
+    explored = set()
+    parent_map = {start_state: start_state}
+    start_time = time.time()
+
+    while frontier:
+        state = heapq.heappop(frontier)
+        if state[2] in frontier_map:
+            frontier_map.pop(state[2])
+        explored.add(state[2])
+        g = state[0] - state[1]
+        max_depth = max(max_depth, g)
+
+        if isGoal(state[2]):
+            found = True
+            break
+
+        for child in getChildren(state[2]):
+            if child not in frontier_map and child not in explored:
+                h = heuristicEuclidean(child) if flag == 1 else heuristicManhattan(child)
+                heapq.heappush(frontier, [h + g + 1, h, child])
+                max_depth = max(max_depth, g + 1)
+                frontier_map[child] = h + g
+                parent_map[child] = state[2]
+
+            elif child in frontier_map:
+                h = heuristicEuclidean(child) if flag == 1 else heuristicManhattan(child)
+                temp = frontier_map[child]
+                if h + g < temp:
+                    # if a smaller f was found, insert the state again in the frontier with the new f
+                    # update the parent map with the new parent for the state
+                    heapq.heappush(frontier, [h + g + 1, h, child])
+                    max_depth = max(max_depth, g + 1)
+                    frontier_map[child] = h + g
+                    parent_map[child] = state[2]
+
+    runtime = round(time.time() - start_time, 3)
+    explored = len(explored)
+    if found:
+        path = getPath(parent_map)
+        cost = len(path) - 1
+        return path, cost, explored, max_depth, runtime
+
+    return explored, max_depth, runtime
 
 
-def checkThree(state: list[list[str]], flag: str) -> int:
-    result = 0
-    # check rows
-    for i in range(6):
-        for j in range(4):
-            # 0,1,1,1
-            if state[i][j] == '0' and state[i][j + 1] == flag and state[i][j + 2] == flag and state[i][j + 3] == flag:
-                result += 1
-            # 1,1,1,0
-            if state[i][j] == flag and state[i][j + 1] == flag and state[i][j + 2] == flag and state[i][j + 3] == '0':
-                result += 1
-    # check columns
-    for j in range(7):
-        for i in range(3):
-            # 0
-            # 1
-            # 1
-            # 1
-            if state[i][j] == flag and state[i + 1][j] == flag and state[i + 2][j] == flag and state[i + 3][j] == '0':
-                result += 1
-    # check diagonals from the left
-    for i in range(3):
-        for j in range(4):
-            if state[i][j] == flag and state[i + 1][j + 1] == flag and state[i + 2][j + 2] == flag and state[i + 3][
-                j + 3] == '0':
-                result += 1
-            if state[i][j] == '0' and state[i + 1][j + 1] == flag and state[i + 2][j + 2] == flag and state[i + 3][
-                j + 3] == flag:
-                result += 1
-    # check diagonals from the right
-    for i in range(3):
-        for j in range(6, 2, -1):
-            if state[i][j] == flag and state[i + 1][j - 1] == flag and state[i + 2][j - 2] == flag and state[i + 3][
-                j - 3] == '0':
-                result += 1
-            if state[i][j] == '0' and state[i + 1][j - 1] == flag and state[i + 2][j - 2] == flag and state[i + 3][
-                j - 3] == flag:
-                result += 1
-    return result
+def DFS(start_state: int) -> tuple:
+    """
+    :param start_state: Start state of the puzzle
+    :return: path, cost, explored, max_depth, runtime if there is a path, else returns explored, max_depth, runtime
+    """
+    max_depth = 0
+    found = False
 
+    # frontier stack with start state inserted
+    # frontier stack is a list of lists
+    # each list consists of the state and its depth
 
-def checkTwo(state: list[list[str]], flag: str) -> int:
-    result = 0
-    # check rows
-    for i in range(6):
-        for j in range(4):
-            # 0,0,1,1
-            if state[i][j] == '0' and state[i][j + 1] == '0' and state[i][j + 2] == flag and state[i][j + 3] == flag:
-                result += 1
-            # 1,1,0,0
-            if state[i][j] == flag and state[i][j + 1] == flag and state[i][j + 2] == '0' and state[i][j + 3] == '0':
-                result += 1
-            # 0,1,1,0
-            if state[i][j] == '0' and state[i][j + 3] == '0' and state[i][j + 1] == flag and state[i][j + 2] == flag:
-                result += 1
-    # check columns
-    for j in range(7):
-        for i in range(3):
-            # 0
-            # 1
-            # 1
-            if state[i][j] == flag and state[i + 1][j] == flag and state[i + 2][j] == '0':
-                result += 1
-    # check diagonals from the left
-    for i in range(3):
-        for j in range(4):
-            #      0
-            #    0
-            #  1
-            # 1
-            if state[i][j] == flag and state[i + 1][j + 1] == flag and state[i + 2][j + 2] == '0' and state[i + 3][
-                j + 3] == '0':
-                result += 1
-            #      0
-            #    1
-            #  1
-            # 0
-            if state[i][j] == '0' and state[i + 3][j + 3] == '0' and state[i + 1][j + 1] == flag and state[i + 2][
-                j + 2] == flag:
-                result += 1
-            #       1
-            #    1
-            #  0
-            # 0
-            if state[i][j] == '0' and state[i + 1][j + 1] == '0' and state[i + 2][j + 2] == flag and state[i + 3][
-                j + 3] == flag:
-                result += 1
-    # check diagonals from the right
-    for i in range(3):
-        for j in range(6, 2, -1):
-            # 0
-            #  0
-            #    1
-            #      1
-            if state[i][j] == flag and state[i + 1][j - 1] == flag and state[i + 2][j - 2] == '0' and state[i + 3][
-                j - 3] == '0':
-                result += 1
-            # 0
-            #  1
-            #    1
-            #      0
-            if state[i][j] == '0' and state[i + 3][j - 3] == '0' and state[i + 1][j - 1] == flag and state[i + 2][
-                j - 2] == flag:
-                result += 1
-            # 1
-            #   1
-            #     0
-            #       0
-            if state[i][j] == '0' and state[i + 1][j - 1] == '0' and state[i + 2][j - 2] == flag and state[i + 3][
-                j - 3] == flag:
-                result += 1
-    return result
+    frontier = [[start_state, 0]]
+    frontier_set = set()
+    frontier_set.add(start_state)
+    explored = set()
+    parent_map = {start_state: start_state}
 
+    start_time = time.time()
 
-def minimax(state: list[list[str]], k: int, pruning: bool, showTree: bool):
-    alpha = -sys.maxsize
-    beta = sys.maxsize
-    tree = Tree()
-    identifier = 1
+    while frontier:
+        state = frontier.pop()
+        frontier_set.remove(state[0])
+        explored.add(state[0])
+        max_depth = max(max_depth, state[1])
 
-    def minmax(state: list[list[str]], k: int, flag: str, parent):
-        nonlocal tree
-        nonlocal identifier
-        c = 0
-        if k == 1 and flag == '2':
-            maximum = -sys.maxsize
-            children = getchildren(state, '2')
-            for child in children:
-                h = heuristic(child)
-                tree.create_node(str(h), parent=parent.identifier)
-                if h > maximum:
-                    maximum = h
-                    c = child
-                    parent.tag = "Max " + str(maximum)
-            return c, maximum
+        if isGoal(state[0]):
+            found = True
+            break
 
-        if k == 1 and flag == '1':
-            minimum = sys.maxsize
-            children = getchildren(state, '1')
-            for child in children:
-                h = heuristic(state)
-                tree.create_node(str(h), parent=parent.identifier)
-                if h < minimum:
-                    minimum = h
-                    c = child
-                    parent.tag = "Min " + str(minimum)
-            return c, minimum
+        for child in getChildren(state[0]):
+            if child not in frontier_set and child not in explored:
+                frontier.append([child, state[1] + 1])
+                max_depth = max(max_depth, state[1] + 1)
+                frontier_set.add(child)
+                parent_map[child] = state[0]
 
-        if flag == '2':
-            children = getchildren(state, '2')
-            maximum = -sys.maxsize
-            for child in children:
-                parent_id = parent.identifier
-                parent = tree.create_node("Max", identifier, parent)
-                identifier += 1
-                value = minmax(child, k - 1, '1', parent)
-                maximum = max(maximum, value[1])
-                parent = tree.get_node(parent_id)
-                if maximum == value[1]:
-                    c = child
-                    parent.tag = "Max " + str(maximum)
+    runtime = round(time.time() - start_time, 3)
+    explored = len(explored)
+    if found:
+        path = getPath(parent_map)
+        cost = len(path) - 1
+        return path, cost, explored, max_depth, runtime
 
-            return c, maximum
-
-        if flag == '1':
-            children = getchildren(state, '1')
-            minimum = sys.maxsize
-            for child in children:
-                parent_id = parent.identifier
-                parent = tree.create_node("Min", identifier, parent)
-                identifier += 1
-                value = minmax(child, k - 1, '2', parent)
-                minimum = min(minimum, value[1])
-                parent = tree.get_node(parent_id)
-                if minimum == value[1]:
-                    c = child
-                    parent.tag = "Min " + str(minimum)
-
-            return c, minimum
-
-    def minmaxPruning(state: list[list[str]], k: int, flag: str):
-        nonlocal alpha
-        nonlocal beta
-        c = 0
-        if k == 1:
-            maximum = -sys.maxsize
-            children = getchildren(state, '2')
-            for child in children:
-                h = heuristic(child)
-                if h > maximum:
-                    maximum = h
-                    c = child
-            return c, maximum
-
-        if flag == '2':
-            children = getchildren(state, '2')
-            maximum = -sys.maxsize
-            for child in children:
-                value = minmaxPruning(child, k - 1, '1')
-                maximum = max(maximum, value[1])
-                alpha = max(alpha, value[1])
-                if maximum == value[1]:
-                    c = child
-
-                if beta <= alpha:
-                    break
-
-            return c, maximum
-
-        if flag == '1':
-            children = getchildren(state, '1')
-            minimum = sys.maxsize
-            for child in children:
-                value = minmaxPruning(child, k - 1, '2')
-                minimum = min(minimum, value[1])
-                beta = min(beta, value[1])
-
-                if minimum == value[1]:
-                    c = child
-
-                if beta <= alpha:
-                    break
-
-            return c, minimum
-
-    result = minmaxPruning(state, k, '2') if pruning else minmax(state, k, '2', tree.create_node("Max", 0))
-    if showTree:
-        tree.show()
-
-    return result
+    return explored, max_depth, runtime
